@@ -62,9 +62,10 @@ class ICM20948 {
   	int begin();
     int configAccel(AccelRange range, AccelDlpfBandwidth bandwidth);
     int configGyro(GyroRange range, GyroDlpfBandwidth bandwidth);
-    /*int setSrd(uint8_t srd);
-    int enableDataReadyInterrupt();
-    int disableDataReadyInterrupt();
+    int setGyroSrd(uint8_t srd);
+    int setAccelSrd(uint16_t srd);
+    /*int enableDataReadyInterrupt();
+    int disableDataReadyInterrupt();*/
     int readSensor();
     float getAccelX_mss();
     float getAccelY_mss();
@@ -72,10 +73,10 @@ class ICM20948 {
     float getGyroX_rads();
     float getGyroY_rads();
     float getGyroZ_rads();
-    float getMagX_uT();
+    /*float getMagX_uT();
     float getMagY_uT();
-    float getMagZ_uT();
-    float getTemperature_C();*/
+    float getMagZ_uT();*/
+    float getTemperature_C();
   protected:
     // i2c
     uint8_t _address;
@@ -109,7 +110,8 @@ class ICM20948 {
     GyroRange _gyroRange;
     AccelDlpfBandwidth _accelBandwidth;
     GyroDlpfBandwidth _gyroBandwidth;
-    uint8_t _srd;
+    uint8_t _gyroSrd;
+    uint16_t _accelSrd;
     // gyro bias estimation
     size_t _numSamples = 100;
     double _gxbD, _gybD, _gzbD;
@@ -169,7 +171,11 @@ class ICM20948 {
     const uint8_t UB0_PWR_MGMNT_2 = 0x07;
     const uint8_t UB0_PWR_MGMNT_2_SEN_ENABLE = 0x00;
 
+    const uint8_t UB0_ACCEL_XOUT_H = 0x2D;
+
     // User bank 2
+    const uint8_t UB2_GYRO_SMPLRT_DIV = 0x00;
+
     const uint8_t UB2_GYRO_CONFIG_1 = 0x01;
     const uint8_t UB2_GYRO_CONFIG_1_FS_SEL_250DPS = 0x00;
     const uint8_t UB2_GYRO_CONFIG_1_FS_SEL_500DPS = 0x02;
@@ -184,6 +190,9 @@ class ICM20948 {
     const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_12HZ  = 0b00101000 | 0x01;
     const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_6HZ   = 0b00110000 | 0x01;
     const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_361HZ = 0b00111000 | 0x01;
+
+    const uint8_t UB2_ACCEL_SMPLRT_DIV_1 = 0x10;
+    const uint8_t UB2_ACCEL_SMPLRT_DIV_2 = 0x11;
 
     const uint8_t UB2_ACCEL_CONFIG = 0x14;
     const uint8_t UB2_ACCEL_CONFIG_FS_SEL_2G = 0x00;

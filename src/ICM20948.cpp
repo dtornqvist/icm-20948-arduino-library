@@ -54,11 +54,13 @@ int ICM20948::begin() {
   if (configGyro(GYRO_RANGE_2000DPS, GYRO_DLPF_BANDWIDTH_197HZ) < 0) {
     return -8;
   }
-  /*
-  if(writeRegister(SMPDIV,0x00) < 0){ 
-    return -11;
+  if (setGyroSrd(0) < 0) { 
+    return -9;
   } 
-  _srd = 0;
+  if (setAccelSrd(0) < 0) { 
+    return -10;
+  } 
+  
   // enable I2C master mode
   /*if(writeRegister(USER_CTRL,I2C_MST_EN) < 0){
   	return -12;
@@ -208,6 +210,103 @@ int ICM20948::configGyro(GyroRange range, GyroDlpfBandwidth bandwidth) {
   _gyroBandwidth = bandwidth;
   return 1;
 }
+
+int ICM20948::setGyroSrd(uint8_t srd) {
+	if (changeUserBank(USER_BANK_2) < 0) {
+  	return -1;
+  }
+  if (writeRegister(UB2_GYRO_SMPLRT_DIV, srd) < 0) {
+  	return -1;
+	}
+	_gyroSrd = srd;
+	return 1;
+}
+
+int ICM20948::setAccelSrd(uint16_t srd) {
+	if (changeUserBank(USER_BANK_2) < 0) {
+  	return -1;
+  }
+  uint8_t srdHigh = srd >> 8 & 0x0F; // Only last 4 bits can be set
+  if (writeRegister(UB2_ACCEL_SMPLRT_DIV_1, srdHigh) < 0) {
+  	return -1;
+	}
+	uint8_t srdLow = srd & 0x0F; // Only last 4 bits can be set
+  if (writeRegister(UB2_ACCEL_SMPLRT_DIV_2, srdLow) < 0) {
+  	return -1;
+	}
+	_accelSrd = srd;
+	return 1;
+}
+
+/* reads the most current data from MPU9250 and stores in buffer */
+int ICM20948::readSensor() {
+	if (changeUserBank(USER_BANK_0) < 0) {
+  	return -1;
+  }
+ 	if (readRegisters(UB0_ACCEL_XOUT_H, 14, _buffer) < 0) {
+    return -1;
+  }
+  // combine into 16 bit values
+  _axcounts = (((int16_t)_buffer[0]) << 8) | _buffer[1];  
+  _aycounts = (((int16_t)_buffer[2]) << 8) | _buffer[3];
+  _azcounts = (((int16_t)_buffer[4]) << 8) | _buffer[5];
+  _gxcounts = (((int16_t)_buffer[6]) << 8) | _buffer[7];
+  _gycounts = (((int16_t)_buffer[8]) << 8) | _buffer[9];
+  _gzcounts = (((int16_t)_buffer[10]) << 8) | _buffer[11];
+  _tcounts = (((int16_t)_buffer[12]) << 8) | _buffer[13];
+  //_hxcounts = (((int16_t)_buffer[15]) << 8) | _buffer[14];
+  //_hycounts = (((int16_t)_buffer[17]) << 8) | _buffer[16];
+  //_hzcounts = (((int16_t)_buffer[19]) << 8) | _buffer[18];
+  // transform and convert to float values
+  _ax = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale) - _axb)*_axs;
+  _ay = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale) - _ayb)*_ays;
+  _az = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale) - _azb)*_azs;
+  _gx = ((float)(tX[0]*_gxcounts + tX[1]*_gycounts + tX[2]*_gzcounts) * _gyroScale) - _gxb;
+  _gy = ((float)(tY[0]*_gxcounts + tY[1]*_gycounts + tY[2]*_gzcounts) * _gyroScale) - _gyb;
+  _gz = ((float)(tZ[0]*_gxcounts + tZ[1]*_gycounts + tZ[2]*_gzcounts) * _gyroScale) - _gzb;
+  _t = ((((float) _tcounts) - _tempOffset)/_tempScale) + _tempOffset;
+  //_hx = (((float)(_hxcounts) * _magScaleX) - _hxb)*_hxs;
+  //_hy = (((float)(_hycounts) * _magScaleY) - _hyb)*_hys;
+  //_hz = (((float)(_hzcounts) * _magScaleZ) - _hzb)*_hzs;
+  return 1;
+}
+
+/* returns the accelerometer measurement in the x direction, m/s/s */
+float ICM20948::getAccelX_mss() {
+  return _ax;
+}
+
+/* returns the accelerometer measurement in the y direction, m/s/s */
+float ICM20948::getAccelY_mss() {
+  return _ay;
+}
+
+/* returns the accelerometer measurement in the z direction, m/s/s */
+float ICM20948::getAccelZ_mss() {
+  return _az;
+}
+
+/* returns the gyroscope measurement in the x direction, rad/s */
+float ICM20948::getGyroX_rads() {
+  return _gx;
+}
+
+/* returns the gyroscope measurement in the y direction, rad/s */
+float ICM20948::getGyroY_rads() {
+  return _gy;
+}
+
+/* returns the gyroscope measurement in the z direction, rad/s */
+float ICM20948::getGyroZ_rads() {
+  return _gz;
+}
+
+/* returns the die temperature, C */
+float ICM20948::getTemperature_C() {
+  return _t;
+}
+
+
 
 /* gets the WHO_AM_I register value, expected to be 0xEA */
 int ICM20948::whoAmI() {
