@@ -2,7 +2,7 @@
 #include "ICM20948.h"
 
 /* ICM20948 object, input the I2C bus and address */
-ICM20948::ICM20948(TwoWire &bus,uint8_t address) {
+ICM20948::ICM20948(TwoWire &bus, uint8_t address) {
   _i2c = &bus; // I2C bus
   _address = address; // I2C address
 }
@@ -15,7 +15,7 @@ int ICM20948::begin() {
   _i2c->setClock(_i2cRate);
 
   // select clock source to auto
-  if(writeRegister(UB0_PWR_MGMNT_1, UB0_PWR_MGMNT_1_CLOCK_SEL_AUTO) < 0){
+  if (writeRegister(UB0_PWR_MGMNT_1, UB0_PWR_MGMNT_1_CLOCK_SEL_AUTO) < 0) {
     return -1;
   }
   // enable I2C master mode
@@ -43,30 +43,18 @@ int ICM20948::begin() {
     return -5;
   }
   // enable accelerometer and gyro
-  if(writeRegister(UB0_PWR_MGMNT_2, UB0_PWR_MGMNT_2_SEN_ENABLE) < 0){
+  if (writeRegister(UB0_PWR_MGMNT_2, UB0_PWR_MGMNT_2_SEN_ENABLE) < 0) {
     return -6;
   }
   // setting accel range to 16G as default
-  /*if(writeRegister(ACCEL_CONFIG,ACCEL_FS_SEL_16G) < 0){
+  if (configAccel(ACCEL_RANGE_16G, ACCEL_DLPF_BANDWIDTH_246HZ) < 0) {
     return -7;
   }
-  _accelScale = G * 16.0f/32767.5f; // setting the accel scale to 16G
-  _accelRange = ACCEL_RANGE_16G;
   // setting the gyro range to 2000DPS as default
-  if(writeRegister(GYRO_CONFIG,GYRO_FS_SEL_2000DPS) < 0){
+  if (configGyro(GYRO_RANGE_2000DPS, GYRO_DLPF_BANDWIDTH_197HZ) < 0) {
     return -8;
   }
-  _gyroScale = 2000.0f/32767.5f * _d2r; // setting the gyro scale to 2000DPS
-  _gyroRange = GYRO_RANGE_2000DPS;
-  // setting bandwidth to 184Hz as default
-  if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_184) < 0){ 
-    return -9;
-  } 
-  if(writeRegister(CONFIG,GYRO_DLPF_184) < 0){ // setting gyro bandwidth to 184Hz
-    return -10;
-  }
-  _bandwidth = DLPF_BANDWIDTH_184HZ;
-  // setting the sample rate divider to 0 as default
+  /*
   if(writeRegister(SMPDIV,0x00) < 0){ 
     return -11;
   } 
@@ -123,14 +111,145 @@ int ICM20948::begin() {
   return 1;
 }
 
+int ICM20948::configAccel(AccelRange range, AccelDlpfBandwidth bandwidth) {
+	if (changeUserBank(USER_BANK_2) < 0) {
+  	return -1;
+  }
+  uint8_t accelRangeRegValue = 0x00;
+  float accelScale = 0.0f;
+  switch(range) {
+    case ACCEL_RANGE_2G: {
+      accelRangeRegValue = UB2_ACCEL_CONFIG_FS_SEL_2G;
+      accelScale = G * 2.0f/accRawScaling; // setting the accel scale to 2G
+      break; 
+    }
+    case ACCEL_RANGE_4G: {
+      accelRangeRegValue = UB2_ACCEL_CONFIG_FS_SEL_4G;
+      accelScale = G * 4.0f/accRawScaling; // setting the accel scale to 4G
+      break;
+    }
+    case ACCEL_RANGE_8G: {
+      accelRangeRegValue = UB2_ACCEL_CONFIG_FS_SEL_8G;
+      accelScale = G * 8.0f/accRawScaling; // setting the accel scale to 8G
+      break;
+    }
+    case ACCEL_RANGE_16G: {
+      accelRangeRegValue = UB2_ACCEL_CONFIG_FS_SEL_16G;
+      accelScale = G * 16.0f/accRawScaling; // setting the accel scale to 16G
+      break;
+    }
+  }
+  uint8_t dlpfRegValue = 0x00;
+  switch(bandwidth) {
+  	case ACCEL_DLPF_BANDWIDTH_1209HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_1209HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_246HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_246HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_111HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_111HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_50HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_50HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_24HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_24HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_12HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_12HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_6HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_6HZ; break;
+  	case ACCEL_DLPF_BANDWIDTH_473HZ: dlpfRegValue = UB2_ACCEL_CONFIG_DLPFCFG_473HZ; break;
+  }
+  if (writeRegister(UB2_ACCEL_CONFIG, accelRangeRegValue | dlpfRegValue) < 0) {
+		return -1;
+  }
+  _accelScale = accelScale;
+  _accelRange = range;
+  _accelBandwidth = bandwidth;
+  return 1;
+}
+
+/* sets the gyro full scale range to values other than default */
+int ICM20948::configGyro(GyroRange range, GyroDlpfBandwidth bandwidth) {
+  if (changeUserBank(USER_BANK_2) < 0) {
+  	return -1;
+  }
+  uint8_t gyroConfigRegValue = 0x00;
+  float gyroScale = 0x00;
+  switch(range) {
+    case GYRO_RANGE_250DPS: {
+    	gyroConfigRegValue = UB2_GYRO_CONFIG_1_FS_SEL_250DPS;
+      gyroScale = 250.0f/gyroRawScaling * _d2r; // setting the gyro scale to 250DPS
+      break;
+    }
+    case GYRO_RANGE_500DPS: {
+      gyroConfigRegValue = UB2_GYRO_CONFIG_1_FS_SEL_500DPS;
+      gyroScale = 500.0f/gyroRawScaling * _d2r; // setting the gyro scale to 500DPS
+      break;  
+    }
+    case GYRO_RANGE_1000DPS: {
+      gyroConfigRegValue = UB2_GYRO_CONFIG_1_FS_SEL_1000DPS;
+      gyroScale = 1000.0f/gyroRawScaling * _d2r; // setting the gyro scale to 1000DPS
+      break;
+    }
+    case GYRO_RANGE_2000DPS: {
+      gyroConfigRegValue = UB2_GYRO_CONFIG_1_FS_SEL_2000DPS;
+      gyroScale = 2000.0f/gyroRawScaling * _d2r; // setting the gyro scale to 2000DPS
+      break;
+    }
+  }
+  uint8_t dlpfRegValue = 0x00;
+  switch(bandwidth) {
+  	case GYRO_DLPF_BANDWIDTH_12106HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_12106HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_197HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_197HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_152HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_152HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_120HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_120HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_51HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_51HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_24HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_24HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_12HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_12HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_6HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_6HZ; break;
+  	case GYRO_DLPF_BANDWIDTH_361HZ: dlpfRegValue = UB2_GYRO_CONFIG_1_DLPFCFG_361HZ; break;
+  }
+  if (writeRegister(UB2_GYRO_CONFIG_1, gyroConfigRegValue | dlpfRegValue) < 0) {
+  	return -1;
+	}
+	_gyroScale = gyroScale;
+  _gyroRange = range;
+  _gyroBandwidth = bandwidth;
+  return 1;
+}
+
 /* gets the WHO_AM_I register value, expected to be 0xEA */
-int ICM20948::whoAmI(){
+int ICM20948::whoAmI() {
+	if (changeUserBank(USER_BANK_0) < 0) {
+  	return -1;
+  }
   // read the WHO AM I register
   if (readRegisters(UB0_WHO_AM_I, 1, _buffer) < 0) {
     return -1;
   }
   // return the register value
   return _buffer[0];
+}
+
+int ICM20948::changeUserBank(UserBank userBank) {
+	if (userBank == _currentUserBank) {
+		return 2; // No need to change
+	}
+	uint8_t userBankRegValue = 0x00;
+	switch(userBank) {
+    case USER_BANK_0: {
+    	userBankRegValue = REG_BANK_SEL_USER_BANK_0;
+  		break;
+    }
+    case USER_BANK_1: {
+    	userBankRegValue = REG_BANK_SEL_USER_BANK_1;
+  		break;
+    }
+    case USER_BANK_2: {
+    	userBankRegValue = REG_BANK_SEL_USER_BANK_2;
+  		break;
+    }
+    case USER_BANK_3: {
+    	userBankRegValue = REG_BANK_SEL_USER_BANK_3;
+  		break;
+    }
+  }
+  if (writeRegister(REG_BANK_SEL, userBankRegValue) < 0) {
+  	return -1;
+  }
+  _currentUserBank = userBank;
+  return 1;
 }
 
 

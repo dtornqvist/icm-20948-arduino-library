@@ -20,14 +20,28 @@ class ICM20948 {
       ACCEL_RANGE_8G,
       ACCEL_RANGE_16G    
     };
-    enum DlpfBandwidth
+    enum AccelDlpfBandwidth
     {
-      DLPF_BANDWIDTH_184HZ,
-      DLPF_BANDWIDTH_92HZ,
-      DLPF_BANDWIDTH_41HZ,
-      DLPF_BANDWIDTH_20HZ,
-      DLPF_BANDWIDTH_10HZ,
-      DLPF_BANDWIDTH_5HZ
+    	ACCEL_DLPF_BANDWIDTH_1209HZ,
+      ACCEL_DLPF_BANDWIDTH_246HZ,
+      ACCEL_DLPF_BANDWIDTH_111HZ,
+      ACCEL_DLPF_BANDWIDTH_50HZ,
+      ACCEL_DLPF_BANDWIDTH_24HZ,
+      ACCEL_DLPF_BANDWIDTH_12HZ,
+      ACCEL_DLPF_BANDWIDTH_6HZ,
+      ACCEL_DLPF_BANDWIDTH_473HZ
+    };
+    enum GyroDlpfBandwidth
+    {
+    	GYRO_DLPF_BANDWIDTH_12106HZ,
+      GYRO_DLPF_BANDWIDTH_197HZ,
+      GYRO_DLPF_BANDWIDTH_152HZ,
+      GYRO_DLPF_BANDWIDTH_120HZ,
+      GYRO_DLPF_BANDWIDTH_51HZ,
+      GYRO_DLPF_BANDWIDTH_24HZ,
+      GYRO_DLPF_BANDWIDTH_12HZ,
+      GYRO_DLPF_BANDWIDTH_6HZ,
+      GYRO_DLPF_BANDWIDTH_361HZ
     };
     enum LpAccelOdr
     {
@@ -46,10 +60,9 @@ class ICM20948 {
     };
   	ICM20948(TwoWire &bus, uint8_t address);
   	int begin();
-    /*int setAccelRange(AccelRange range);
-    int setGyroRange(GyroRange range);
-    int setDlpfBandwidth(DlpfBandwidth bandwidth);
-    int setSrd(uint8_t srd);
+    int configAccel(AccelRange range, AccelDlpfBandwidth bandwidth);
+    int configGyro(GyroRange range, GyroDlpfBandwidth bandwidth);
+    /*int setSrd(uint8_t srd);
     int enableDataReadyInterrupt();
     int disableDataReadyInterrupt();
     int readSensor();
@@ -63,7 +76,7 @@ class ICM20948 {
     float getMagY_uT();
     float getMagZ_uT();
     float getTemperature_C();*/
-    protected:
+  protected:
     // i2c
     uint8_t _address;
     TwoWire *_i2c;
@@ -94,7 +107,8 @@ class ICM20948 {
     // configuration
     AccelRange _accelRange;
     GyroRange _gyroRange;
-    DlpfBandwidth _bandwidth;
+    AccelDlpfBandwidth _accelBandwidth;
+    GyroDlpfBandwidth _gyroBandwidth;
     uint8_t _srd;
     // gyro bias estimation
     size_t _numSamples = 100;
@@ -122,6 +136,16 @@ class ICM20948 {
     float _hys = 1.0f;
     float _hzs = 1.0f;
     float _avgs;
+
+    enum UserBank
+    {
+    	USER_BANK_0,
+    	USER_BANK_1,
+    	USER_BANK_2,
+    	USER_BANK_3,
+    };
+    UserBank _currentUserBank = USER_BANK_0;
+
     // transformation matrix
     /* transform the accel and gyro axes to match the magnetometer axes */
     const int16_t tX[3] = {0,  1,  0}; 
@@ -130,6 +154,10 @@ class ICM20948 {
     // constants
     const float G = 9.807f;
     const float _d2r = 3.14159265359f/180.0f;
+
+    const float accRawScaling = 32767.5f; // =(2^16-1)/2 16 bit representation of acc value to cover +/- range
+    const float gyroRawScaling = 32767.5f; // =(2^16-1)/2 16 bit representation of gyro value to cover +/- range
+
     // ICM20948 registers
     // User bank 0
     const uint8_t UB0_WHO_AM_I = 0x00;
@@ -141,6 +169,36 @@ class ICM20948 {
     const uint8_t UB0_PWR_MGMNT_2 = 0x07;
     const uint8_t UB0_PWR_MGMNT_2_SEN_ENABLE = 0x00;
 
+    // User bank 2
+    const uint8_t UB2_GYRO_CONFIG_1 = 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_FS_SEL_250DPS = 0x00;
+    const uint8_t UB2_GYRO_CONFIG_1_FS_SEL_500DPS = 0x02;
+    const uint8_t UB2_GYRO_CONFIG_1_FS_SEL_1000DPS = 0x04;
+    const uint8_t UB2_GYRO_CONFIG_1_FS_SEL_2000DPS = 0x06;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_12106HZ = 0x00;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_197HZ = 0x00 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_152HZ = 0b00001000 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_120HZ = 0b00010000 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_51HZ  = 0b00011000 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_24HZ  = 0b00100000 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_12HZ  = 0b00101000 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_6HZ   = 0b00110000 | 0x01;
+    const uint8_t UB2_GYRO_CONFIG_1_DLPFCFG_361HZ = 0b00111000 | 0x01;
+
+    const uint8_t UB2_ACCEL_CONFIG = 0x14;
+    const uint8_t UB2_ACCEL_CONFIG_FS_SEL_2G = 0x00;
+    const uint8_t UB2_ACCEL_CONFIG_FS_SEL_4G = 0x02;
+    const uint8_t UB2_ACCEL_CONFIG_FS_SEL_8G = 0x04;
+    const uint8_t UB2_ACCEL_CONFIG_FS_SEL_16G = 0x06;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_1209HZ = 0x00;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_246HZ = 0x00 | 0x01;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_111HZ = 0b00010000 | 0x01;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_50HZ  = 0b00011000 | 0x01;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_24HZ  = 0b00100000 | 0x01;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_12HZ  = 0b00101000 | 0x01;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_6HZ   = 0b00110000 | 0x01;
+    const uint8_t UB2_ACCEL_CONFIG_DLPFCFG_473HZ = 0b00111000 | 0x01;
+
     // Common to all user banks
     const uint8_t REG_BANK_SEL = 0x7F;
     const uint8_t REG_BANK_SEL_USER_BANK_0 = 0x00;
@@ -149,6 +207,7 @@ class ICM20948 {
     const uint8_t REG_BANK_SEL_USER_BANK_3 = 0x30;
 
 		// private functions
+		int changeUserBank(UserBank userBank);
     int writeRegister(uint8_t subAddress, uint8_t data);
     int readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest);
     int whoAmI();
