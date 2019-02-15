@@ -7,15 +7,12 @@ ICM20948::ICM20948(TwoWire &bus, uint8_t address) {
   _address = address; // I2C address
 }
 
-/* starts communication with the MPU-9250 */
+/* starts communication with the ICM-20948 */
 int ICM20948::begin() {
-  // starting the I2C bus
-  _i2c->begin();
-  // setting the I2C clock
-  _i2c->setClock(_i2cRate);
+  _i2c->begin(); // starting the I2C bus
+  _i2c->setClock(_i2cRate); // setting the I2C clock
 
-  // select clock source to auto
-  if (writeRegister(UB0_PWR_MGMNT_1, UB0_PWR_MGMNT_1_CLOCK_SEL_AUTO) < 0) {
+  if (selectAutoClockSource() < 0) {
     return -1;
   }
   // enable I2C master mode
@@ -42,15 +39,12 @@ int ICM20948::begin() {
   if (whoAmI() != 0xEA) {
     return -5;
   }
-  // enable accelerometer and gyro
-  if (writeRegister(UB0_PWR_MGMNT_2, UB0_PWR_MGMNT_2_SEN_ENABLE) < 0) {
+  if (enableAccelGyro() < 0) {
     return -6;
   }
-  // setting accel range to 16G as default
   if (configAccel(ACCEL_RANGE_16G, ACCEL_DLPF_BANDWIDTH_246HZ) < 0) {
     return -7;
   }
-  // setting the gyro range to 2000DPS as default
   if (configGyro(GYRO_RANGE_2000DPS, GYRO_DLPF_BANDWIDTH_197HZ) < 0) {
     return -8;
   }
@@ -110,6 +104,45 @@ int ICM20948::begin() {
     return -20;
   }*/
   // successful init, return 1
+  return 1;
+}
+
+/* enables the data ready interrupt */
+int ICM20948::enableDataReadyInterrupt() {
+	if (changeUserBank(USER_BANK_0) < 0) {
+    return -1;
+  }
+  if (writeRegister(UB0_INT_PIN_CFG, UB0_INT_PIN_CFG_HIGH_50US) < 0) { // setup interrupt, 50 us pulse
+    return -2;
+  }  
+  if (writeRegister(UB0_INT_ENABLE_1, UB0_INT_ENABLE_1_RAW_RDY_EN) < 0) { // set to data ready
+    return -3;
+  }
+  return 1;
+}
+
+/* disables the data ready interrupt */
+int ICM20948::disableDataReadyInterrupt() {
+  if (changeUserBank(USER_BANK_0) < 0) {
+    return -1;
+  }
+  if (writeRegister(UB0_INT_ENABLE_1, UB0_INT_ENABLE_1_DIS) < 0) { // disable interrupt
+    return -1;
+  }  
+  return 1;
+}
+
+int ICM20948::selectAutoClockSource() {
+	if (changeUserBank(USER_BANK_0) < 0 || writeRegister(UB0_PWR_MGMNT_1, UB0_PWR_MGMNT_1_CLOCK_SEL_AUTO) < 0) {
+    return -1;
+  }
+  return 1;
+}
+
+int ICM20948::enableAccelGyro() {
+	if (changeUserBank(USER_BANK_0) < 0 || writeRegister(UB0_PWR_MGMNT_2, UB0_PWR_MGMNT_2_SEN_ENABLE) < 0) {
+    return -1;
+  }
   return 1;
 }
 
@@ -212,10 +245,7 @@ int ICM20948::configGyro(GyroRange range, GyroDlpfBandwidth bandwidth) {
 }
 
 int ICM20948::setGyroSrd(uint8_t srd) {
-	if (changeUserBank(USER_BANK_2) < 0) {
-  	return -1;
-  }
-  if (writeRegister(UB2_GYRO_SMPLRT_DIV, srd) < 0) {
+	if (changeUserBank(USER_BANK_2) < 0 || writeRegister(UB2_GYRO_SMPLRT_DIV, srd) < 0) {
   	return -1;
 	}
 	_gyroSrd = srd;

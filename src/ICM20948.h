@@ -58,14 +58,21 @@ class ICM20948 {
       LP_ACCEL_ODR_250HZ = 10,
       LP_ACCEL_ODR_500HZ = 11
     };
+    enum UserBank
+    {
+    	USER_BANK_0,
+    	USER_BANK_1,
+    	USER_BANK_2,
+    	USER_BANK_3,
+    };
   	ICM20948(TwoWire &bus, uint8_t address);
   	int begin();
     int configAccel(AccelRange range, AccelDlpfBandwidth bandwidth);
     int configGyro(GyroRange range, GyroDlpfBandwidth bandwidth);
     int setGyroSrd(uint8_t srd);
     int setAccelSrd(uint16_t srd);
-    /*int enableDataReadyInterrupt();
-    int disableDataReadyInterrupt();*/
+    int enableDataReadyInterrupt();
+    int disableDataReadyInterrupt();
     int readSensor();
     float getAccelX_mss();
     float getAccelY_mss();
@@ -110,6 +117,7 @@ class ICM20948 {
     GyroRange _gyroRange;
     AccelDlpfBandwidth _accelBandwidth;
     GyroDlpfBandwidth _gyroBandwidth;
+    UserBank _currentUserBank = USER_BANK_0;
     uint8_t _gyroSrd;
     uint16_t _accelSrd;
     // gyro bias estimation
@@ -139,15 +147,6 @@ class ICM20948 {
     float _hzs = 1.0f;
     float _avgs;
 
-    enum UserBank
-    {
-    	USER_BANK_0,
-    	USER_BANK_1,
-    	USER_BANK_2,
-    	USER_BANK_3,
-    };
-    UserBank _currentUserBank = USER_BANK_0;
-
     // transformation matrix
     /* transform the accel and gyro axes to match the magnetometer axes */
     const int16_t tX[3] = {0,  1,  0}; 
@@ -170,6 +169,14 @@ class ICM20948 {
 
     const uint8_t UB0_PWR_MGMNT_2 = 0x07;
     const uint8_t UB0_PWR_MGMNT_2_SEN_ENABLE = 0x00;
+
+    const uint8_t UB0_INT_PIN_CFG = 0x0F;
+    const uint8_t UB0_INT_PIN_CFG_HIGH_50US = 0x00;
+
+    const uint8_t UB0_INT_ENABLE_1 = 0x11;
+    const uint8_t UB0_INT_ENABLE_1_RAW_RDY_EN = 0x01;
+    const uint8_t UB0_INT_ENABLE_1_DIS = 0x00;
+
 
     const uint8_t UB0_ACCEL_XOUT_H = 0x2D;
 
@@ -216,6 +223,8 @@ class ICM20948 {
     const uint8_t REG_BANK_SEL_USER_BANK_3 = 0x30;
 
 		// private functions
+		int selectAutoClockSource();
+		int enableAccelGyro();
 		int changeUserBank(UserBank userBank);
     int writeRegister(uint8_t subAddress, uint8_t data);
     int readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest);
