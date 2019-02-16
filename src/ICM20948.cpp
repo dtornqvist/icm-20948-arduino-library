@@ -62,11 +62,6 @@ int ICM20948::begin() {
     return -19;
   }       
   readMagRegisters(MAG_HXL, MAG_DATA_LENGTH, _buffer); // instruct the ICM20948 to get data from the magnetometer at the sample rate
-  // estimate gyro bias
-  /*if (calibrateGyro() < 0) {
-    return -20;
-  }*/
-  // successful init, return 1
   return 1;
 }
 
@@ -284,16 +279,16 @@ int ICM20948::readSensor() {
   _hycounts = (((int16_t)_buffer[17]) << 8) | _buffer[16];
   _hzcounts = (((int16_t)_buffer[19]) << 8) | _buffer[18];
   // transform and convert to float values
-  _ax = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale) - _axb)*_axs;
-  _ay = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale) - _ayb)*_ays;
-  _az = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale) - _azb)*_azs;
-  _gx = ((float)(tX[0]*_gxcounts + tX[1]*_gycounts + tX[2]*_gzcounts) * _gyroScale) - _gxb;
-  _gy = ((float)(tY[0]*_gxcounts + tY[1]*_gycounts + tY[2]*_gzcounts) * _gyroScale) - _gyb;
-  _gz = ((float)(tZ[0]*_gxcounts + tZ[1]*_gycounts + tZ[2]*_gzcounts) * _gyroScale) - _gzb;
+  _ax = (((float)_axcounts * _accelScale) - _axb)*_axs;
+  _ay = (((float)_aycounts * _accelScale) - _ayb)*_ays;
+  _az = (((float)_azcounts * _accelScale) - _azb)*_azs;
+  _gx = ((float)_gxcounts * _gyroScale) - _gxb;
+  _gy = ((float)_gycounts * _gyroScale) - _gyb;
+  _gz = ((float)_gzcounts * _gyroScale) - _gzb;
   _t = ((((float) _tcounts) - _tempOffset)/_tempScale) + _tempOffset;
-  _hx = (((float)(_hxcounts) * _magScale) - _hxb)*_hxs;
-  _hy = (((float)(_hycounts) * _magScale) - _hyb)*_hys;
-  _hz = (((float)(_hzcounts) * _magScale) - _hzb)*_hzs;
+  _hx = (((float)(tX[0]*_hxcounts + tX[1]*_hycounts + tX[2]*_hzcounts) * _magScale) - _hxb)*_hxs;
+  _hy = (((float)(tY[0]*_hxcounts + tY[1]*_hycounts + tY[2]*_hzcounts) * _magScale) - _hyb)*_hys;
+  _hz = (((float)(tZ[0]*_hxcounts + tZ[1]*_hycounts + tZ[2]*_hzcounts) * _magScale) - _hzb)*_hzs;
   return 1;
 }
 
@@ -422,7 +417,7 @@ int ICM20948::writeMagRegister(uint8_t subAddress, uint8_t data) {
 	if (writeRegister(UB3_I2C_SLV0_ADDR, MAG_AK09916_I2C_ADDR) < 0) {
     return -2;
   }
-  // set the register to the desired AK8963 sub address 
+  // set the register to the desired magnetometer sub address 
 	if (writeRegister(UB3_I2C_SLV0_REG, subAddress) < 0) {
     return -3;
   }
@@ -451,7 +446,7 @@ int ICM20948::readMagRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest)
 	if (writeRegister(UB3_I2C_SLV0_ADDR, MAG_AK09916_I2C_ADDR | UB3_I2C_SLV0_ADDR_READ_FLAG) < 0) {
     return -2;
   }
-  // set the register to the desired AK8963 sub address
+  // set the register to the desired magnetometer sub address
 	if (writeRegister(UB3_I2C_SLV0_REG, subAddress) < 0) {
     return -3;
   }
@@ -460,7 +455,7 @@ int ICM20948::readMagRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest)
     return -4;
   }
 	delay(1); // takes some time for these registers to fill
-  // read the bytes off the MPU9250 EXT_SENS_DATA registers
+  // read the bytes off the ICM-20948 EXT_SLV_SENS_DATA registers
   if (changeUserBank(USER_BANK_0) < 0) {
   	return -5;
   }

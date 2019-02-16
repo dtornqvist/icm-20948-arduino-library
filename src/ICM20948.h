@@ -148,9 +148,9 @@ class ICM20948 {
     float _avgs;
 
     // transformation matrix
-    /* transform the accel and gyro axes to match the magnetometer axes */
-    const int16_t tX[3] = {0,  1,  0}; 
-    const int16_t tY[3] = {1,  0,  0};
+    /* transform the magnetometer values to match the coordinate system of the IMU */
+    const int16_t tX[3] = {1,  0,  0}; 
+    const int16_t tY[3] = {0, -1,  0};
     const int16_t tZ[3] = {0,  0, -1};
     // constants
     const float G = 9.807f;
