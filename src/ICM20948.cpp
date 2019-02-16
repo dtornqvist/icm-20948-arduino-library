@@ -61,8 +61,7 @@ int ICM20948::begin() {
   if(selectAutoClockSource() < 0) { // TODO: Why do this again here?
     return -19;
   }       
-  // instruct the ICM20948 to get 7 bytes of data from the magnetometer at the sample rate
-  readMagRegisters(MAG_HXL, 7, _buffer);
+  readMagRegisters(MAG_HXL, MAG_DATA_LENGTH, _buffer); // instruct the ICM20948 to get data from the magnetometer at the sample rate
   // estimate gyro bias
   /*if (calibrateGyro() < 0) {
     return -20;

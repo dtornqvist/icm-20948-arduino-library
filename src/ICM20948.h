@@ -248,6 +248,7 @@ class ICM20948 {
     // Magnetometer constants
 		const uint8_t MAG_AK09916_I2C_ADDR = 0x0C;
 		const uint16_t MAG_AK09916_WHO_AM_I = 0x4809;
+		const uint8_t MAG_DATA_LENGTH = 8; // Bytes
 
 		// Magnetometer (AK09916) registers
 		const uint8_t MAG_WHO_AM_I = 0x00;
@@ -256,6 +257,8 @@ class ICM20948 {
 
 		const uint8_t MAG_CNTL2 = 0x31;
 		const uint8_t MAG_CNTL2_POWER_DOWN = 0x00;
+		const uint8_t MAG_CNTL2_MODE_10HZ = 0x02;
+		const uint8_t MAG_CNTL2_MODE_50HZ = 0x06;
 		const uint8_t MAG_CNTL2_MODE_100HZ = 0x08;
 
 		const uint8_t MAG_CNTL3 = 0x32;
