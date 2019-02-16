@@ -38,13 +38,13 @@ void loop() {
   Serial.print("\t");
   Serial.print(IMU.getGyroZ_rads(),6);
   Serial.print("\t");
-  Serial.println(IMU.getTemperature_C(),6);
-  /*Serial.print(IMU.getMagX_uT(),6);
+  Serial.print(IMU.getMagX_uT(),6);
   Serial.print("\t");
   Serial.print(IMU.getMagY_uT(),6);
   Serial.print("\t");
   Serial.print(IMU.getMagZ_uT(),6);
-  Serial.print("\t");*/
+  Serial.print("\t");
+  Serial.println(IMU.getTemperature_C(),6);
   
   delay(100);
 }

@@ -12,98 +12,78 @@ int ICM20948::begin() {
   _i2c->begin(); // starting the I2C bus
   _i2c->setClock(_i2cRate); // setting the I2C clock
 
-  if (selectAutoClockSource() < 0) {
+  if (changeUserBank(USER_BANK_0, true) < 0) { // Make sure that the user bank selection is in sync
+  	return -1;
+  }
+  if (selectAutoClockSource() < 0) { // TODO: Why set clock source here? It is resetted anyway...
     return -1;
   }
   // enable I2C master mode
-  /*if(writeRegister(USER_CTRL, USER_CTRL_I2C_MST_EN) < 0){
+  if(enableI2cMaster() < 0){
     return -2;
   }
-  // set the I2C bus speed to 400 kHz
-  if(writeRegister(I2C_MST_CTRL, I2C_MST_CLK) < 0){
-    return -3;
-  }*/
-  // set AK8963 to Power Down
-  //writeAK8963Register(AK8963_CNTL1,AK8963_PWR_DOWN);
-  // reset the ICM20948
-  //writeRegister(PWR_MGMNT_1,PWR_RESET);
-  // wait for MPU-9250 to come back up
-  //delay(1);
-  // reset the AK8963
-  //writeAK8963Register(AK8963_CNTL2,AK8963_RESET);
-  // select clock source to auto
-  /*if(writeRegister(PWR_MGMNT_1, PWR_MGMNT_1_CLOCK_SEL_AUTO) < 0){
-    return -4;
-  }*/
-  // check the WHO AM I byte, expected value is 0xEA
-  if (whoAmI() != 0xEA) {
-    return -5;
+  if (powerDownMag() < 0) {
+  	return -3;
   }
-  if (enableAccelGyro() < 0) {
+  reset(); // reset the ICM20948. Don't check return value as a reset clears the register and can't be verified.
+  delay(1); // wait for ICM-20948 to come back up
+  resetMag(); // Don't check return value as a reset clears the register and can't be verified.
+  if (selectAutoClockSource() < 0) {
     return -6;
   }
-  if (configAccel(ACCEL_RANGE_16G, ACCEL_DLPF_BANDWIDTH_246HZ) < 0) {
+  if (whoAmI() != ICM20948_WHO_AM_I) {
     return -7;
   }
-  if (configGyro(GYRO_RANGE_2000DPS, GYRO_DLPF_BANDWIDTH_197HZ) < 0) {
+  if (enableAccelGyro() < 0) {
     return -8;
   }
-  if (setGyroSrd(0) < 0) { 
+  if (configAccel(ACCEL_RANGE_16G, ACCEL_DLPF_BANDWIDTH_246HZ) < 0) {
     return -9;
+  }
+  if (configGyro(GYRO_RANGE_2000DPS, GYRO_DLPF_BANDWIDTH_197HZ) < 0) {
+    return -10;
+  }
+  if (setGyroSrd(0) < 0) { 
+    return -11;
   } 
   if (setAccelSrd(0) < 0) { 
-    return -10;
-  } 
-  
-  // enable I2C master mode
-  /*if(writeRegister(USER_CTRL,I2C_MST_EN) < 0){
-  	return -12;
+    return -12;
   }
-	// set the I2C bus speed to 400 kHz
-	if( writeRegister(I2C_MST_CTRL,I2C_MST_CLK) < 0){
-		return -13;
-	}
-	// check AK8963 WHO AM I register, expected value is 0x48 (decimal 72)
-	if( whoAmIAK8963() != 72 ){
+  if(enableI2cMaster() < 0) {
+    return -13;
+  }
+	if(whoAmIMag() != MAG_AK09916_WHO_AM_I ) {
     return -14;
 	}
-  /* get the magnetometer calibration */
-  // set AK8963 to Power Down
-  /*if(writeAK8963Register(AK8963_CNTL1,AK8963_PWR_DOWN) < 0){
-    return -15;
-  }
-  delay(100); // long wait between AK8963 mode changes
-  // set AK8963 to FUSE ROM access
-  if(writeAK8963Register(AK8963_CNTL1,AK8963_FUSE_ROM) < 0){
-    return -16;
-  }
-  delay(100); // long wait between AK8963 mode changes
-  // read the AK8963 ASA registers and compute magnetometer scale factors
-  readAK8963Registers(AK8963_ASA,3,_buffer);
-  _magScaleX = ((((float)_buffer[0]) - 128.0f)/(256.0f) + 1.0f) * 4912.0f / 32760.0f; // micro Tesla
-  _magScaleY = ((((float)_buffer[1]) - 128.0f)/(256.0f) + 1.0f) * 4912.0f / 32760.0f; // micro Tesla
-  _magScaleZ = ((((float)_buffer[2]) - 128.0f)/(256.0f) + 1.0f) * 4912.0f / 32760.0f; // micro Tesla 
-  // set AK8963 to Power Down
-  if(writeAK8963Register(AK8963_CNTL1,AK8963_PWR_DOWN) < 0){
-    return -17;
-  }
-  delay(100); // long wait between AK8963 mode changes  
-  // set AK8963 to 16 bit resolution, 100 Hz update rate
-  if(writeAK8963Register(AK8963_CNTL1,AK8963_CNT_MEAS2) < 0){
+  if(configMag() < 0){
     return -18;
   }
-  delay(100); // long wait between AK8963 mode changes
-  // select clock source to gyro
-  if(writeRegister(PWR_MGMNT_1,CLOCK_SEL_PLL) < 0){
+  if(selectAutoClockSource() < 0) { // TODO: Why do this again here?
     return -19;
   }       
-  // instruct the ICM20948 to get 7 bytes of data from the AK8963 at the sample rate
-  readAK8963Registers(AK8963_HXL,7,_buffer);
+  // instruct the ICM20948 to get 7 bytes of data from the magnetometer at the sample rate
+  readMagRegisters(MAG_HXL, 7, _buffer);
   // estimate gyro bias
-  if (calibrateGyro() < 0) {
+  /*if (calibrateGyro() < 0) {
     return -20;
   }*/
   // successful init, return 1
+  return 1;
+}
+
+int ICM20948::enableI2cMaster() {
+	if (changeUserBank(USER_BANK_0) < 0) {
+    return -1;
+  }
+  if (writeRegister(UB0_USER_CTRL, UB0_USER_CTRL_I2C_MST_EN) < 0) {
+    return -2;
+  }
+  if (changeUserBank(USER_BANK_3) < 0) {
+    return -3;
+  }
+  if(writeRegister(UB3_I2C_MST_CTRL, UB3_I2C_MST_CTRL_CLK_400KHZ) < 0){
+    return -4;
+  }
   return 1;
 }
 
@@ -129,6 +109,16 @@ int ICM20948::disableDataReadyInterrupt() {
   if (writeRegister(UB0_INT_ENABLE_1, UB0_INT_ENABLE_1_DIS) < 0) { // disable interrupt
     return -1;
   }  
+  return 1;
+}
+
+int ICM20948::reset() {
+	if (changeUserBank(USER_BANK_0) < 0) {
+    return -1;
+  }
+  if (writeRegister(UB0_PWR_MGMNT_1, UB0_PWR_MGMNT_1_DEV_RESET) < 0) {
+  	return -2;
+  }
   return 1;
 }
 
@@ -244,6 +234,13 @@ int ICM20948::configGyro(GyroRange range, GyroDlpfBandwidth bandwidth) {
   return 1;
 }
 
+int ICM20948::configMag() { // TODO: Add possibility to use other modes
+	if (writeMagRegister(MAG_CNTL2, MAG_CNTL2_MODE_100HZ) < 0) {
+		return -1;
+	}
+	return 1;
+}
+
 int ICM20948::setGyroSrd(uint8_t srd) {
 	if (changeUserBank(USER_BANK_2) < 0 || writeRegister(UB2_GYRO_SMPLRT_DIV, srd) < 0) {
   	return -1;
@@ -273,7 +270,7 @@ int ICM20948::readSensor() {
 	if (changeUserBank(USER_BANK_0) < 0) {
   	return -1;
   }
- 	if (readRegisters(UB0_ACCEL_XOUT_H, 14, _buffer) < 0) {
+ 	if (readRegisters(UB0_ACCEL_XOUT_H, 20, _buffer) < 0) {
     return -1;
   }
   // combine into 16 bit values
@@ -284,9 +281,9 @@ int ICM20948::readSensor() {
   _gycounts = (((int16_t)_buffer[8]) << 8) | _buffer[9];
   _gzcounts = (((int16_t)_buffer[10]) << 8) | _buffer[11];
   _tcounts = (((int16_t)_buffer[12]) << 8) | _buffer[13];
-  //_hxcounts = (((int16_t)_buffer[15]) << 8) | _buffer[14];
-  //_hycounts = (((int16_t)_buffer[17]) << 8) | _buffer[16];
-  //_hzcounts = (((int16_t)_buffer[19]) << 8) | _buffer[18];
+  _hxcounts = (((int16_t)_buffer[15]) << 8) | _buffer[14];
+  _hycounts = (((int16_t)_buffer[17]) << 8) | _buffer[16];
+  _hzcounts = (((int16_t)_buffer[19]) << 8) | _buffer[18];
   // transform and convert to float values
   _ax = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale) - _axb)*_axs;
   _ay = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale) - _ayb)*_ays;
@@ -295,9 +292,9 @@ int ICM20948::readSensor() {
   _gy = ((float)(tY[0]*_gxcounts + tY[1]*_gycounts + tY[2]*_gzcounts) * _gyroScale) - _gyb;
   _gz = ((float)(tZ[0]*_gxcounts + tZ[1]*_gycounts + tZ[2]*_gzcounts) * _gyroScale) - _gzb;
   _t = ((((float) _tcounts) - _tempOffset)/_tempScale) + _tempOffset;
-  //_hx = (((float)(_hxcounts) * _magScaleX) - _hxb)*_hxs;
-  //_hy = (((float)(_hycounts) * _magScaleY) - _hyb)*_hys;
-  //_hz = (((float)(_hzcounts) * _magScaleZ) - _hzb)*_hzs;
+  _hx = (((float)(_hxcounts) * _magScale) - _hxb)*_hxs;
+  _hy = (((float)(_hycounts) * _magScale) - _hyb)*_hys;
+  _hz = (((float)(_hzcounts) * _magScale) - _hzb)*_hzs;
   return 1;
 }
 
@@ -331,12 +328,25 @@ float ICM20948::getGyroZ_rads() {
   return _gz;
 }
 
+/* returns the magnetometer measurement in the x direction, uT */
+float ICM20948::getMagX_uT() {
+  return _hx;
+}
+
+/* returns the magnetometer measurement in the y direction, uT */
+float ICM20948::getMagY_uT() {
+  return _hy;
+}
+
+/* returns the magnetometer measurement in the z direction, uT */
+float ICM20948::getMagZ_uT() {
+  return _hz;
+}
+
 /* returns the die temperature, C */
 float ICM20948::getTemperature_C() {
   return _t;
 }
-
-
 
 /* gets the WHO_AM_I register value, expected to be 0xEA */
 int ICM20948::whoAmI() {
@@ -351,8 +361,33 @@ int ICM20948::whoAmI() {
   return _buffer[0];
 }
 
+int ICM20948::whoAmIMag() {
+	if (readMagRegisters(MAG_WHO_AM_I, 2, _buffer) < 0) {
+    return -1;
+  }
+  return (_buffer[0] << 8) + _buffer[1];
+}
+
+int ICM20948::powerDownMag() {
+	if (writeMagRegister(MAG_CNTL2, MAG_CNTL2_POWER_DOWN) < 0) {
+		return -1;
+	}
+	return 1;
+}
+
+int ICM20948::resetMag() {
+	if (writeMagRegister(MAG_CNTL3, MAG_CNTL3_RESET) < 0) {
+		return -1;
+	}
+	return 1;
+}
+
 int ICM20948::changeUserBank(UserBank userBank) {
-	if (userBank == _currentUserBank) {
+	return changeUserBank(userBank, false);
+}
+
+int ICM20948::changeUserBank(UserBank userBank, bool force) {
+	if (!force && userBank == _currentUserBank) {
 		return 2; // No need to change
 	}
 	uint8_t userBankRegValue = 0x00;
@@ -381,6 +416,58 @@ int ICM20948::changeUserBank(UserBank userBank) {
   return 1;
 }
 
+int ICM20948::writeMagRegister(uint8_t subAddress, uint8_t data) {
+	if (changeUserBank(USER_BANK_3) < 0) {
+  	return -1;
+  }
+	if (writeRegister(UB3_I2C_SLV0_ADDR, MAG_AK09916_I2C_ADDR) < 0) {
+    return -2;
+  }
+  // set the register to the desired AK8963 sub address 
+	if (writeRegister(UB3_I2C_SLV0_REG, subAddress) < 0) {
+    return -3;
+  }
+  // store the data for write
+	if (writeRegister(UB3_I2C_SLV0_DO, data) < 0) {
+    return -4;
+  }
+  // enable I2C and send 1 byte
+	if (writeRegister(UB3_I2C_SLV0_CTRL, UB3_I2C_SLV0_CTRL_EN | (uint8_t)1) < 0) {
+    return -5;
+  }
+	// read the register and confirm
+	if (readMagRegisters(subAddress, 1, _buffer) < 0) {
+    return -6;
+  }
+	if(_buffer[0] != data) {
+  	return -7;
+  }
+  return 1;
+}
+
+int ICM20948::readMagRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest) {
+	if (changeUserBank(USER_BANK_3) < 0) {
+  	return -1;
+  }
+	if (writeRegister(UB3_I2C_SLV0_ADDR, MAG_AK09916_I2C_ADDR | UB3_I2C_SLV0_ADDR_READ_FLAG) < 0) {
+    return -2;
+  }
+  // set the register to the desired AK8963 sub address
+	if (writeRegister(UB3_I2C_SLV0_REG, subAddress) < 0) {
+    return -3;
+  }
+  // enable I2C and request the bytes
+	if (writeRegister(UB3_I2C_SLV0_CTRL, UB3_I2C_SLV0_CTRL_EN | count) < 0) {
+    return -4;
+  }
+	delay(1); // takes some time for these registers to fill
+  // read the bytes off the MPU9250 EXT_SENS_DATA registers
+  if (changeUserBank(USER_BANK_0) < 0) {
+  	return -5;
+  }
+	_status = readRegisters(UB0_EXT_SLV_SENS_DATA_00, count, dest); 
+  return _status;
+}
 
 /* writes a byte to ICM20948 register given a register address and data */
 int ICM20948::writeRegister(uint8_t subAddress, uint8_t data) {
